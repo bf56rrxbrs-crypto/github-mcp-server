@@ -1,0 +1,29 @@
+{
+  "annotations": {
+    "title": "Delete release"
+  },
+  "description": "Delete a release in a GitHub repository",
+  "inputSchema": {
+    "properties": {
+      "owner": {
+        "description": "Repository owner",
+        "type": "string"
+      },
+      "release_id": {
+        "description": "The ID of the release to delete",
+        "type": "number"
+      },
+      "repo": {
+        "description": "Repository name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "release_id"
+    ],
+    "type": "object"
+  },
+  "name": "delete_release"
+}

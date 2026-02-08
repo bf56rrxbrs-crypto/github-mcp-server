@@ -3379,6 +3379,323 @@ func Test_GetReleaseByTag(t *testing.T) {
 	}
 }
 
+func Test_CreateRelease(t *testing.T) {
+	serverTool := CreateRelease(translations.NullTranslationHelper)
+	tool := serverTool.Tool
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	schema, ok := tool.InputSchema.(*jsonschema.Schema)
+	require.True(t, ok, "InputSchema should be *jsonschema.Schema")
+
+	assert.Equal(t, "create_release", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.False(t, tool.Annotations.ReadOnlyHint, "create_release tool should not be read-only")
+	assert.Contains(t, schema.Properties, "owner")
+	assert.Contains(t, schema.Properties, "repo")
+	assert.Contains(t, schema.Properties, "tag_name")
+	assert.ElementsMatch(t, schema.Required, []string{"owner", "repo", "tag_name"})
+
+	mockRelease := &github.RepositoryRelease{
+		ID:      github.Ptr(int64(1)),
+		TagName: github.Ptr("v2.0.0"),
+		Name:    github.Ptr("Release v2.0.0"),
+		Body:    github.Ptr("New release"),
+	}
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]interface{}
+		expectError    bool
+		expectedResult *github.RepositoryRelease
+		expectedErrMsg string
+	}{
+		{
+			name: "successful release creation",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"POST /repos/owner/repo/releases",
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusCreated)
+						body, _ := json.Marshal(mockRelease)
+						_, _ = w.Write(body)
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":    "owner",
+				"repo":     "repo",
+				"tag_name": "v2.0.0",
+				"name":     "Release v2.0.0",
+				"body":     "New release",
+			},
+			expectError:    false,
+			expectedResult: mockRelease,
+		},
+		{
+			name: "fail to create release - tag already exists",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"POST /repos/owner/repo/releases",
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusUnprocessableEntity)
+						_, _ = w.Write([]byte(`{"message": "Validation Failed"}`))
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":    "owner",
+				"repo":     "repo",
+				"tag_name": "v2.0.0",
+			},
+			expectError:    false,
+			expectedErrMsg: "failed to create release",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := github.NewClient(tc.mockedClient)
+			deps := BaseDeps{
+				Client: client,
+			}
+			handler := serverTool.Handler(deps)
+
+			request := createMCPRequest(tc.requestArgs)
+			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if tc.expectedErrMsg != "" {
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
+				return
+			}
+
+			require.False(t, result.IsError)
+			textContent := getTextResult(t, result)
+
+			var returnedRelease github.RepositoryRelease
+			err = json.Unmarshal([]byte(textContent.Text), &returnedRelease)
+			require.NoError(t, err)
+			assert.Equal(t, *tc.expectedResult.TagName, *returnedRelease.TagName)
+		})
+	}
+}
+
+func Test_UpdateRelease(t *testing.T) {
+	serverTool := UpdateRelease(translations.NullTranslationHelper)
+	tool := serverTool.Tool
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	schema, ok := tool.InputSchema.(*jsonschema.Schema)
+	require.True(t, ok, "InputSchema should be *jsonschema.Schema")
+
+	assert.Equal(t, "update_release", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.False(t, tool.Annotations.ReadOnlyHint, "update_release tool should not be read-only")
+	assert.Contains(t, schema.Properties, "owner")
+	assert.Contains(t, schema.Properties, "repo")
+	assert.Contains(t, schema.Properties, "release_id")
+	assert.ElementsMatch(t, schema.Required, []string{"owner", "repo", "release_id"})
+
+	mockRelease := &github.RepositoryRelease{
+		ID:      github.Ptr(int64(123)),
+		TagName: github.Ptr("v2.0.1"),
+		Name:    github.Ptr("Updated Release"),
+		Body:    github.Ptr("Updated body"),
+	}
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]interface{}
+		expectError    bool
+		expectedResult *github.RepositoryRelease
+		expectedErrMsg string
+	}{
+		{
+			name: "successful release update",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"PATCH /repos/owner/repo/releases/123",
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusOK)
+						body, _ := json.Marshal(mockRelease)
+						_, _ = w.Write(body)
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":      "owner",
+				"repo":       "repo",
+				"release_id": 123,
+				"name":       "Updated Release",
+				"body":       "Updated body",
+			},
+			expectError:    false,
+			expectedResult: mockRelease,
+		},
+		{
+			name: "fail to update release - not found",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"PATCH /repos/owner/repo/releases/999",
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNotFound)
+						_, _ = w.Write([]byte(`{"message": "Not Found"}`))
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":      "owner",
+				"repo":       "repo",
+				"release_id": 999,
+				"name":       "Updated Release",
+			},
+			expectError:    false,
+			expectedErrMsg: "failed to update release",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := github.NewClient(tc.mockedClient)
+			deps := BaseDeps{
+				Client: client,
+			}
+			handler := serverTool.Handler(deps)
+
+			request := createMCPRequest(tc.requestArgs)
+			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if tc.expectedErrMsg != "" {
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
+				return
+			}
+
+			require.False(t, result.IsError)
+			textContent := getTextResult(t, result)
+
+			var returnedRelease github.RepositoryRelease
+			err = json.Unmarshal([]byte(textContent.Text), &returnedRelease)
+			require.NoError(t, err)
+			assert.Equal(t, *tc.expectedResult.Name, *returnedRelease.Name)
+		})
+	}
+}
+
+func Test_DeleteRelease(t *testing.T) {
+	serverTool := DeleteRelease(translations.NullTranslationHelper)
+	tool := serverTool.Tool
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	schema, ok := tool.InputSchema.(*jsonschema.Schema)
+	require.True(t, ok, "InputSchema should be *jsonschema.Schema")
+
+	assert.Equal(t, "delete_release", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.False(t, tool.Annotations.ReadOnlyHint, "delete_release tool should not be read-only")
+	assert.Contains(t, schema.Properties, "owner")
+	assert.Contains(t, schema.Properties, "repo")
+	assert.Contains(t, schema.Properties, "release_id")
+	assert.ElementsMatch(t, schema.Required, []string{"owner", "repo", "release_id"})
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]interface{}
+		expectError    bool
+		expectedErrMsg string
+	}{
+		{
+			name: "successful release deletion",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"DELETE /repos/owner/repo/releases/123",
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNoContent)
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":      "owner",
+				"repo":       "repo",
+				"release_id": 123,
+			},
+			expectError: false,
+		},
+		{
+			name: "fail to delete release - not found",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"DELETE /repos/owner/repo/releases/999",
+					http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+						w.WriteHeader(http.StatusNotFound)
+						_, _ = w.Write([]byte(`{"message": "Not Found"}`))
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":      "owner",
+				"repo":       "repo",
+				"release_id": 999,
+			},
+			expectError:    false,
+			expectedErrMsg: "failed to delete release",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := github.NewClient(tc.mockedClient)
+			deps := BaseDeps{
+				Client: client,
+			}
+			handler := serverTool.Handler(deps)
+
+			request := createMCPRequest(tc.requestArgs)
+			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+
+			if tc.expectedErrMsg != "" {
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
+				return
+			}
+
+			require.False(t, result.IsError)
+			textContent := getTextResult(t, result)
+			assert.Contains(t, textContent.Text, "deleted successfully")
+		})
+	}
+}
+
 func Test_looksLikeSHA(t *testing.T) {
 	tests := []struct {
 		name     string
