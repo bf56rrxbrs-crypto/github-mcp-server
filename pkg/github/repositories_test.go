@@ -682,6 +682,112 @@ func Test_CreateBranch(t *testing.T) {
 	}
 }
 
+func Test_DeleteBranch(t *testing.T) {
+	// Verify tool definition once
+	serverTool := DeleteBranch(translations.NullTranslationHelper)
+	tool := serverTool.Tool
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	schema, ok := tool.InputSchema.(*jsonschema.Schema)
+	require.True(t, ok, "InputSchema should be *jsonschema.Schema")
+
+	assert.Equal(t, "delete_branch", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.False(t, tool.Annotations.ReadOnlyHint, "delete_branch tool should not be read-only")
+	assert.Contains(t, schema.Properties, "owner")
+	assert.Contains(t, schema.Properties, "repo")
+	assert.Contains(t, schema.Properties, "branch")
+	assert.ElementsMatch(t, schema.Required, []string{"owner", "repo", "branch"})
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]interface{}
+		expectError    bool
+		expectedErrMsg string
+	}{
+		{
+			name: "successful branch deletion",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				"DELETE /repos/owner/repo/git/refs/heads/feature-branch": func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusNoContent)
+				},
+			}),
+			requestArgs: map[string]interface{}{
+				"owner":  "owner",
+				"repo":   "repo",
+				"branch": "feature-branch",
+			},
+			expectError: false,
+		},
+		{
+			name: "fail to delete nonexistent branch",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				"DELETE /repos/owner/repo/git/refs/heads/nonexistent": func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusUnprocessableEntity)
+					_, _ = w.Write([]byte(`{"message": "Reference does not exist"}`))
+				},
+			}),
+			requestArgs: map[string]interface{}{
+				"owner":  "owner",
+				"repo":   "repo",
+				"branch": "nonexistent",
+			},
+			expectError:    true,
+			expectedErrMsg: "failed to delete branch",
+		},
+		{
+			name: "fail to delete protected branch",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				"DELETE /repos/owner/repo/git/refs/heads/main": func(w http.ResponseWriter, _ *http.Request) {
+					w.WriteHeader(http.StatusForbidden)
+					_, _ = w.Write([]byte(`{"message": "Protected branch"}`))
+				},
+			}),
+			requestArgs: map[string]interface{}{
+				"owner":  "owner",
+				"repo":   "repo",
+				"branch": "main",
+			},
+			expectError:    true,
+			expectedErrMsg: "failed to delete branch",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup client with mock
+			client := github.NewClient(tc.mockedClient)
+			deps := BaseDeps{
+				Client: client,
+			}
+			handler := serverTool.Handler(deps)
+
+			// Create call request
+			request := createMCPRequest(tc.requestArgs)
+
+			// Call handler
+			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
+
+			// Verify results
+			if tc.expectError {
+				require.NoError(t, err)
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+			require.False(t, result.IsError)
+
+			// Parse the result and verify success message
+			textContent := getTextResult(t, result)
+			assert.Contains(t, textContent.Text, "deleted successfully")
+		})
+	}
+}
+
 func Test_GetCommit(t *testing.T) {
 	// Verify tool definition once
 	serverTool := GetCommit(translations.NullTranslationHelper)
