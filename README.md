@@ -1160,6 +1160,18 @@ The following sets of tools are available:
   - `repo`: Repository name (string, required)
   - `sha`: The blob SHA of the file being replaced. (string, optional)
 
+- **create_release** - Create release
+  - **Required OAuth Scopes**: `repo`
+  - `body`: Text describing the contents of the release (supports Markdown) (string, optional)
+  - `draft`: True to create a draft (unpublished) release, false to create a published one. Default: false (boolean, optional)
+  - `generate_release_notes`: Whether to automatically generate release notes. Default: false (boolean, optional)
+  - `name`: The name of the release (string, optional)
+  - `owner`: Repository owner (string, required)
+  - `prerelease`: True to identify the release as a prerelease, false to identify the release as a full release. Default: false (boolean, optional)
+  - `repo`: Repository name (string, required)
+  - `tag_name`: The name of the tag (e.g., 'v1.0.0') (string, required)
+  - `target_commitish`: Specifies the commitish value that determines where the Git tag is created from. Can be any branch or commit SHA. Unused if the Git tag already exists. Defaults to the repository's default branch (usually 'main'). (string, optional)
+
 - **create_repository** - Create repository
   - **Required OAuth Scopes**: `repo`
   - `autoInit`: Initialize with README (boolean, optional)
@@ -1168,12 +1180,24 @@ The following sets of tools are available:
   - `organization`: Organization to create the repository in (omit to create in your personal account) (string, optional)
   - `private`: Whether repo should be private (boolean, optional)
 
+- **delete_branch** - Delete branch
+  - **Required OAuth Scopes**: `repo`
+  - `branch`: Name of branch to delete (string, required)
+  - `owner`: Repository owner (string, required)
+  - `repo`: Repository name (string, required)
+
 - **delete_file** - Delete file
   - **Required OAuth Scopes**: `repo`
   - `branch`: Branch to delete the file from (string, required)
   - `message`: Commit message (string, required)
   - `owner`: Repository owner (username or organization) (string, required)
   - `path`: Path to the file to delete (string, required)
+  - `repo`: Repository name (string, required)
+
+- **delete_release** - Delete release
+  - **Required OAuth Scopes**: `repo`
+  - `owner`: Repository owner (string, required)
+  - `release_id`: The ID of the release to delete (number, required)
   - `repo`: Repository name (string, required)
 
 - **fork_repository** - Fork repository
@@ -1270,6 +1294,18 @@ The following sets of tools are available:
   - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
   - `query`: Repository search query. Examples: 'machine learning in:name stars:>1000 language:python', 'topic:react', 'user:facebook'. Supports advanced search syntax for precise filtering. (string, required)
   - `sort`: Sort repositories by field, defaults to best match (string, optional)
+
+- **update_release** - Update release
+  - **Required OAuth Scopes**: `repo`
+  - `body`: Text describing the contents of the release (string, optional)
+  - `draft`: True to make this a draft release, false to publish it (boolean, optional)
+  - `name`: The name of the release (string, optional)
+  - `owner`: Repository owner (string, required)
+  - `prerelease`: True to identify the release as a prerelease (boolean, optional)
+  - `release_id`: The ID of the release to update (number, required)
+  - `repo`: Repository name (string, required)
+  - `tag_name`: The name of the tag (string, optional)
+  - `target_commitish`: Specifies the commitish value that determines where the Git tag is created from (string, optional)
 
 </details>
 

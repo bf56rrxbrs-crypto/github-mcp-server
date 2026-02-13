@@ -1,0 +1,53 @@
+{
+  "annotations": {
+    "title": "Create release"
+  },
+  "description": "Create a new release in a GitHub repository",
+  "inputSchema": {
+    "properties": {
+      "body": {
+        "description": "Text describing the contents of the release (supports Markdown)",
+        "type": "string"
+      },
+      "draft": {
+        "description": "True to create a draft (unpublished) release, false to create a published one. Default: false",
+        "type": "boolean"
+      },
+      "generate_release_notes": {
+        "description": "Whether to automatically generate release notes. Default: false",
+        "type": "boolean"
+      },
+      "name": {
+        "description": "The name of the release",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner",
+        "type": "string"
+      },
+      "prerelease": {
+        "description": "True to identify the release as a prerelease, false to identify the release as a full release. Default: false",
+        "type": "boolean"
+      },
+      "repo": {
+        "description": "Repository name",
+        "type": "string"
+      },
+      "tag_name": {
+        "description": "The name of the tag (e.g., 'v1.0.0')",
+        "type": "string"
+      },
+      "target_commitish": {
+        "description": "Specifies the commitish value that determines where the Git tag is created from. Can be any branch or commit SHA. Unused if the Git tag already exists. Defaults to the repository's default branch (usually 'main').",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "tag_name"
+    ],
+    "type": "object"
+  },
+  "name": "create_release"
+}

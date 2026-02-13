@@ -1,0 +1,29 @@
+{
+  "annotations": {
+    "title": "Delete branch"
+  },
+  "description": "Delete a branch in a GitHub repository",
+  "inputSchema": {
+    "properties": {
+      "branch": {
+        "description": "Name of branch to delete",
+        "type": "string"
+      },
+      "owner": {
+        "description": "Repository owner",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo",
+      "branch"
+    ],
+    "type": "object"
+  },
+  "name": "delete_branch"
+}
