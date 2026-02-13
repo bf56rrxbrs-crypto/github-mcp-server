@@ -2100,44 +2100,48 @@ func UpdateRelease(t translations.TranslationHelperFunc) inventory.ServerTool {
 				return utils.NewToolResultError(err.Error()), nil, nil
 			}
 
-			tagName, err := OptionalParam[string](args, "tag_name")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			targetCommitish, err := OptionalParam[string](args, "target_commitish")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			name, err := OptionalParam[string](args, "name")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			body, err := OptionalParam[string](args, "body")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			draft, err := OptionalParam[bool](args, "draft")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			prerelease, err := OptionalParam[bool](args, "prerelease")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-
 			client, err := deps.GetClient(ctx)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get GitHub client: %w", err)
 			}
 
-			// Build the release request
-			releaseReq := &github.RepositoryRelease{
-				TagName:         github.Ptr(tagName),
-				TargetCommitish: github.Ptr(targetCommitish),
-				Name:            github.Ptr(name),
-				Body:            github.Ptr(body),
-				Draft:           github.Ptr(draft),
-				Prerelease:      github.Ptr(prerelease),
+			// Build the release request with only provided fields
+			releaseReq := &github.RepositoryRelease{}
+
+			if tagName, ok, err := OptionalParamOK[string](args, "tag_name"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.TagName = github.Ptr(tagName)
+			}
+
+			if targetCommitish, ok, err := OptionalParamOK[string](args, "target_commitish"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.TargetCommitish = github.Ptr(targetCommitish)
+			}
+
+			if name, ok, err := OptionalParamOK[string](args, "name"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Name = github.Ptr(name)
+			}
+
+			if body, ok, err := OptionalParamOK[string](args, "body"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Body = github.Ptr(body)
+			}
+
+			if draft, ok, err := OptionalParamOK[bool](args, "draft"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Draft = github.Ptr(draft)
+			}
+
+			if prerelease, ok, err := OptionalParamOK[bool](args, "prerelease"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Prerelease = github.Ptr(prerelease)
 			}
 
 			release, resp, err := client.Repositories.EditRelease(ctx, owner, repo, releaseID, releaseReq)

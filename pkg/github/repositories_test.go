@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -3542,6 +3543,86 @@ func Test_UpdateRelease(t *testing.T) {
 			},
 			expectError:    false,
 			expectedResult: mockRelease,
+		},
+		{
+			name: "update with only required fields - should not send optional fields",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"PATCH /repos/owner/repo/releases/456",
+					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						// Verify request body only contains fields that should be updated
+						body, _ := io.ReadAll(r.Body)
+						var requestData map[string]interface{}
+						_ = json.Unmarshal(body, &requestData)
+
+						// Should not have any fields set since we're only providing required args
+						assert.Empty(t, requestData, "Request body should be empty when only required fields provided")
+
+						w.WriteHeader(http.StatusOK)
+						response := &github.RepositoryRelease{
+							ID:      github.Ptr(int64(456)),
+							TagName: github.Ptr("v1.0.0"),
+							Name:    github.Ptr("Existing Release"),
+						}
+						respBody, _ := json.Marshal(response)
+						_, _ = w.Write(respBody)
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":      "owner",
+				"repo":       "repo",
+				"release_id": 456,
+			},
+			expectError: false,
+			expectedResult: &github.RepositoryRelease{
+				ID:      github.Ptr(int64(456)),
+				TagName: github.Ptr("v1.0.0"),
+				Name:    github.Ptr("Existing Release"),
+			},
+		},
+		{
+			name: "update with only name field - should not send other optional fields",
+			mockedClient: NewMockedHTTPClient(
+				WithRequestMatchHandler(
+					"PATCH /repos/owner/repo/releases/789",
+					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						// Verify request body only contains the name field
+						body, _ := io.ReadAll(r.Body)
+						var requestData map[string]interface{}
+						_ = json.Unmarshal(body, &requestData)
+
+						assert.Contains(t, requestData, "name", "Request should contain name field")
+						assert.Equal(t, "Only Name Updated", requestData["name"])
+
+						// Should not have other optional fields
+						assert.NotContains(t, requestData, "body", "Request should not contain body field")
+						assert.NotContains(t, requestData, "draft", "Request should not contain draft field")
+						assert.NotContains(t, requestData, "prerelease", "Request should not contain prerelease field")
+						assert.NotContains(t, requestData, "tag_name", "Request should not contain tag_name field")
+						assert.NotContains(t, requestData, "target_commitish", "Request should not contain target_commitish field")
+
+						w.WriteHeader(http.StatusOK)
+						response := &github.RepositoryRelease{
+							ID:   github.Ptr(int64(789)),
+							Name: github.Ptr("Only Name Updated"),
+						}
+						respBody, _ := json.Marshal(response)
+						_, _ = w.Write(respBody)
+					}),
+				),
+			),
+			requestArgs: map[string]interface{}{
+				"owner":      "owner",
+				"repo":       "repo",
+				"release_id": 789,
+				"name":       "Only Name Updated",
+			},
+			expectError: false,
+			expectedResult: &github.RepositoryRelease{
+				ID:   github.Ptr(int64(789)),
+				Name: github.Ptr("Only Name Updated"),
+			},
 		},
 		{
 			name: "fail to update release - not found",
