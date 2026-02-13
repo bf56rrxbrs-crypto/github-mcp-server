@@ -1970,45 +1970,52 @@ func CreateRelease(t translations.TranslationHelperFunc) inventory.ServerTool {
 				return utils.NewToolResultError(err.Error()), nil, nil
 			}
 
-			targetCommitish, err := OptionalParam[string](args, "target_commitish")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			name, err := OptionalParam[string](args, "name")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			body, err := OptionalParam[string](args, "body")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			draft, err := OptionalParam[bool](args, "draft")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			prerelease, err := OptionalParam[bool](args, "prerelease")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-			generateReleaseNotes, err := OptionalParam[bool](args, "generate_release_notes")
-			if err != nil {
-				return utils.NewToolResultError(err.Error()), nil, nil
-			}
-
 			client, err := deps.GetClient(ctx)
 			if err != nil {
 				return nil, nil, fmt.Errorf("failed to get GitHub client: %w", err)
 			}
 
-			// Build the release request
+			// Build the release request with required fields
 			releaseReq := &github.RepositoryRelease{
-				TagName:              github.Ptr(tagName),
-				TargetCommitish:      github.Ptr(targetCommitish),
-				Name:                 github.Ptr(name),
-				Body:                 github.Ptr(body),
-				Draft:                github.Ptr(draft),
-				Prerelease:           github.Ptr(prerelease),
-				GenerateReleaseNotes: github.Ptr(generateReleaseNotes),
+				TagName: github.Ptr(tagName),
+			}
+
+			// Only set optional string fields when explicitly provided
+			if targetCommitish, ok, err := OptionalParamOK[string](args, "target_commitish"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.TargetCommitish = github.Ptr(targetCommitish)
+			}
+
+			if name, ok, err := OptionalParamOK[string](args, "name"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Name = github.Ptr(name)
+			}
+
+			if body, ok, err := OptionalParamOK[string](args, "body"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Body = github.Ptr(body)
+			}
+
+			// Optional boolean fields
+			if draft, ok, err := OptionalParamOK[bool](args, "draft"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Draft = github.Ptr(draft)
+			}
+
+			if prerelease, ok, err := OptionalParamOK[bool](args, "prerelease"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.Prerelease = github.Ptr(prerelease)
+			}
+
+			if generateReleaseNotes, ok, err := OptionalParamOK[bool](args, "generate_release_notes"); err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			} else if ok {
+				releaseReq.GenerateReleaseNotes = github.Ptr(generateReleaseNotes)
 			}
 
 			release, resp, err := client.Repositories.CreateRelease(ctx, owner, repo, releaseReq)

@@ -3551,9 +3551,11 @@ func Test_UpdateRelease(t *testing.T) {
 					"PATCH /repos/owner/repo/releases/456",
 					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						// Verify request body only contains fields that should be updated
-						body, _ := io.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
+						require.NoError(t, err)
 						var requestData map[string]interface{}
-						_ = json.Unmarshal(body, &requestData)
+						err = json.Unmarshal(body, &requestData)
+						require.NoError(t, err)
 
 						// Should not have any fields set since we're only providing required args
 						assert.Empty(t, requestData, "Request body should be empty when only required fields provided")
@@ -3588,9 +3590,11 @@ func Test_UpdateRelease(t *testing.T) {
 					"PATCH /repos/owner/repo/releases/789",
 					http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						// Verify request body only contains the name field
-						body, _ := io.ReadAll(r.Body)
+						body, err := io.ReadAll(r.Body)
+						require.NoError(t, err)
 						var requestData map[string]interface{}
-						_ = json.Unmarshal(body, &requestData)
+						err = json.Unmarshal(body, &requestData)
+						require.NoError(t, err)
 
 						assert.Contains(t, requestData, "name", "Request should contain name field")
 						assert.Equal(t, "Only Name Updated", requestData["name"])
