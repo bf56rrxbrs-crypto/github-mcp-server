@@ -104,8 +104,10 @@ func Test_ListGlobalSecurityAdvisories(t *testing.T) {
 
 			// Verify results
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				require.NoError(t, err)
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
 				return
 			}
 
@@ -216,8 +218,10 @@ func Test_GetGlobalSecurityAdvisory(t *testing.T) {
 
 			// Verify results
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				require.NoError(t, err)
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
 				return
 			}
 
@@ -347,8 +351,10 @@ func Test_ListRepositorySecurityAdvisories(t *testing.T) {
 			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				require.NoError(t, err)
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
 				return
 			}
 
@@ -477,8 +483,10 @@ func Test_ListOrgRepositorySecurityAdvisories(t *testing.T) {
 			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.expectedErrMsg)
+				require.NoError(t, err)
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
 				return
 			}
 

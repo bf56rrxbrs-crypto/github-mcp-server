@@ -105,7 +105,7 @@ func ListWorkflows(t translations.TranslationHelperFunc) inventory.ServerTool {
 
 			workflows, resp, err := client.Actions.ListWorkflows(ctx, owner, repo, opts)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to list workflows: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to list workflows", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -260,7 +260,7 @@ func ListWorkflowRuns(t translations.TranslationHelperFunc) inventory.ServerTool
 
 			workflowRuns, resp, err := client.Actions.ListWorkflowRunsByFileName(ctx, owner, repo, workflowID, opts)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to list workflow runs: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to list workflow runs", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -363,7 +363,7 @@ func RunWorkflow(t translations.TranslationHelperFunc) inventory.ServerTool {
 			}
 
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to run workflow: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to run workflow", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -442,7 +442,7 @@ func GetWorkflowRun(t translations.TranslationHelperFunc) inventory.ServerTool {
 
 			workflowRun, resp, err := client.Actions.GetWorkflowRunByID(ctx, owner, repo, runID)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get workflow run: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to get workflow run", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -512,7 +512,7 @@ func GetWorkflowRunLogs(t translations.TranslationHelperFunc) inventory.ServerTo
 			// Get the download URL for the logs
 			url, resp, err := client.Actions.GetWorkflowRunLogs(ctx, owner, repo, runID, 1)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get workflow run logs: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to get workflow run logs", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -616,7 +616,7 @@ func ListWorkflowJobs(t translations.TranslationHelperFunc) inventory.ServerTool
 
 			jobs, resp, err := client.Actions.ListWorkflowJobs(ctx, owner, repo, runID, opts)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to list workflow jobs: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to list workflow jobs", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -776,7 +776,10 @@ func handleFailedJobLogs(ctx context.Context, client *github.Client, owner, repo
 			"total_jobs":  len(jobs.Jobs),
 			"failed_jobs": 0,
 		}
-		r, _ := json.Marshal(result)
+		r, err := json.Marshal(result)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal response: %w", err)
+		}
 		return utils.NewToolResultText(string(r)), nil, nil
 	}
 

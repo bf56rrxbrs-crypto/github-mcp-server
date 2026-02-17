@@ -1736,7 +1736,7 @@ func ListReleases(t translations.TranslationHelperFunc) inventory.ServerTool {
 
 			releases, resp, err := client.Repositories.ListReleases(ctx, owner, repo, opts)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to list releases: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to list releases", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -1802,7 +1802,7 @@ func GetLatestRelease(t translations.TranslationHelperFunc) inventory.ServerTool
 
 			release, resp, err := client.Repositories.GetLatestRelease(ctx, owner, repo)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get latest release: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to get latest release", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
