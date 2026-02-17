@@ -186,7 +186,7 @@ func ListGlobalSecurityAdvisories(t translations.TranslationHelperFunc) inventor
 
 			advisories, resp, err := client.SecurityAdvisories.ListGlobalSecurityAdvisories(ctx, opts)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to list global security advisories: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to list global security advisories", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -290,7 +290,7 @@ func ListRepositorySecurityAdvisories(t translations.TranslationHelperFunc) inve
 
 			advisories, resp, err := client.SecurityAdvisories.ListRepositorySecurityAdvisories(ctx, owner, repo, opts)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to list repository security advisories: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to list repository security advisories", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -347,7 +347,7 @@ func GetGlobalSecurityAdvisory(t translations.TranslationHelperFunc) inventory.S
 
 			advisory, resp, err := client.SecurityAdvisories.GetGlobalSecurityAdvisories(ctx, ghsaID)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to get advisory: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to get advisory", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
@@ -442,7 +442,7 @@ func ListOrgRepositorySecurityAdvisories(t translations.TranslationHelperFunc) i
 
 			advisories, resp, err := client.SecurityAdvisories.ListRepositorySecurityAdvisoriesForOrg(ctx, org, opts)
 			if err != nil {
-				return nil, nil, fmt.Errorf("failed to list organization repository security advisories: %w", err)
+				return ghErrors.NewGitHubAPIErrorResponse(ctx, "failed to list organization repository security advisories", resp, err), nil, nil
 			}
 			defer func() { _ = resp.Body.Close() }()
 
