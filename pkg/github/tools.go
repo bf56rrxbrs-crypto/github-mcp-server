@@ -163,6 +163,7 @@ func AllTools(t translations.TranslationHelperFunc) []inventory.ServerTool {
 
 		// Repository tools
 		SearchRepositories(t),
+		GetRepository(t),
 		GetFileContents(t),
 		ListCommits(t),
 		SearchCode(t),
@@ -186,6 +187,7 @@ func AllTools(t translations.TranslationHelperFunc) []inventory.ServerTool {
 		ListStarredRepositories(t),
 		StarRepository(t),
 		UnstarRepository(t),
+		ListRepositoryCollaborators(t),
 
 		// Git tools
 		GetRepositoryTree(t),
