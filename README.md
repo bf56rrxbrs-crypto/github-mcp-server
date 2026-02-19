@@ -86,6 +86,7 @@ Alternatively, to manually configure VS Code, choose the appropriate JSON block 
 - **[Claude Applications](/docs/installation-guides/install-claude.md)** - Installation guide for Claude Desktop and Claude Code CLI
 - **[Codex](/docs/installation-guides/install-codex.md)** - Installation guide for OpenAI Codex
 - **[Cursor](/docs/installation-guides/install-cursor.md)** - Installation guide for Cursor IDE
+- **[Taskade](/docs/installation-guides/install-taskade.md)** - Installation guide for Taskade AI Agents
 - **[Windsurf](/docs/installation-guides/install-windsurf.md)** - Installation guide for Windsurf IDE
 - **[Rovo Dev CLI](/docs/installation-guides/install-rovo-dev-cli.md)** - Installation guide for Rovo Dev CLI
 
@@ -356,6 +357,7 @@ For other MCP host applications, please refer to our installation guides:
 - **[Claude Code & Claude Desktop](docs/installation-guides/install-claude.md)** - Installation guide for Claude Code and Claude Desktop
 - **[Cursor](docs/installation-guides/install-cursor.md)** - Installation guide for Cursor IDE
 - **[Google Gemini CLI](docs/installation-guides/install-gemini-cli.md)** - Installation guide for Google Gemini CLI
+- **[Taskade](docs/installation-guides/install-taskade.md)** - Installation guide for Taskade AI Agents
 - **[Windsurf](docs/installation-guides/install-windsurf.md)** - Installation guide for Windsurf IDE
 
 For a complete overview of all installation options, see our **[Installation Guides Index](docs/installation-guides)**.
