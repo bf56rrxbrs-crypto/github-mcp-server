@@ -1,0 +1,25 @@
+{
+  "annotations": {
+    "readOnlyHint": true,
+    "title": "Get repository details"
+  },
+  "description": "Get details of a specific GitHub repository. Returns repository metadata including description, stars, forks, language, topics, and more.",
+  "inputSchema": {
+    "properties": {
+      "owner": {
+        "description": "Repository owner (username or organization)",
+        "type": "string"
+      },
+      "repo": {
+        "description": "Repository name",
+        "type": "string"
+      }
+    },
+    "required": [
+      "owner",
+      "repo"
+    ],
+    "type": "object"
+  },
+  "name": "get_repository"
+}

@@ -4550,3 +4550,225 @@ func Test_UnstarRepository(t *testing.T) {
 		})
 	}
 }
+
+func Test_GetRepository(t *testing.T) {
+	// Verify tool definition once
+	serverTool := GetRepository(translations.NullTranslationHelper)
+	tool := serverTool.Tool
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	schema, ok := tool.InputSchema.(*jsonschema.Schema)
+	require.True(t, ok, "InputSchema should be *jsonschema.Schema")
+
+	assert.Equal(t, "get_repository", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.True(t, tool.Annotations.ReadOnlyHint)
+	assert.Contains(t, schema.Properties, "owner")
+	assert.Contains(t, schema.Properties, "repo")
+	assert.ElementsMatch(t, schema.Required, []string{"owner", "repo"})
+
+	updatedAt := time.Now().Add(-2 * time.Hour)
+	createdAt := time.Now().Add(-30 * 24 * time.Hour)
+	mockRepo := &github.Repository{
+		ID:              github.Ptr(int64(12345)),
+		Name:            github.Ptr("my-repo"),
+		FullName:        github.Ptr("owner/my-repo"),
+		Description:     github.Ptr("A test repository"),
+		HTMLURL:         github.Ptr("https://github.com/owner/my-repo"),
+		Language:        github.Ptr("Go"),
+		StargazersCount: github.Ptr(42),
+		ForksCount:      github.Ptr(7),
+		OpenIssuesCount: github.Ptr(3),
+		Private:         github.Ptr(false),
+		Fork:            github.Ptr(false),
+		Archived:        github.Ptr(false),
+		DefaultBranch:   github.Ptr("main"),
+		Topics:          []string{"go", "mcp"},
+		UpdatedAt:       &github.Timestamp{Time: updatedAt},
+		CreatedAt:       &github.Timestamp{Time: createdAt},
+	}
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]interface{}
+		expectError    bool
+		expectedErrMsg string
+	}{
+		{
+			name: "successful get",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				GetReposByOwnerByRepo: mockResponse(t, http.StatusOK, mockRepo),
+			}),
+			requestArgs: map[string]interface{}{
+				"owner": "owner",
+				"repo":  "my-repo",
+			},
+			expectError: false,
+		},
+		{
+			name: "repository not found",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				GetReposByOwnerByRepo: mockResponse(t, http.StatusNotFound, `{"message": "Not Found"}`),
+			}),
+			requestArgs: map[string]interface{}{
+				"owner": "owner",
+				"repo":  "nonexistent",
+			},
+			expectError:    true,
+			expectedErrMsg: "failed to get repository",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := github.NewClient(tc.mockedClient)
+			deps := BaseDeps{Client: client}
+			handler := serverTool.Handler(deps)
+
+			request := createMCPRequest(tc.requestArgs)
+			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
+
+			if tc.expectError {
+				require.NoError(t, err)
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+			require.False(t, result.IsError)
+
+			textContent := getTextResult(t, result)
+			var returnedRepo MinimalRepository
+			err = json.Unmarshal([]byte(textContent.Text), &returnedRepo)
+			require.NoError(t, err)
+
+			assert.Equal(t, "my-repo", returnedRepo.Name)
+			assert.Equal(t, "owner/my-repo", returnedRepo.FullName)
+			assert.Equal(t, "A test repository", returnedRepo.Description)
+			assert.Equal(t, "Go", returnedRepo.Language)
+			assert.Equal(t, 42, returnedRepo.Stars)
+			assert.Equal(t, "main", returnedRepo.DefaultBranch)
+			assert.ElementsMatch(t, []string{"go", "mcp"}, returnedRepo.Topics)
+		})
+	}
+}
+
+func Test_ListRepositoryCollaborators(t *testing.T) {
+	// Verify tool definition once
+	serverTool := ListRepositoryCollaborators(translations.NullTranslationHelper)
+	tool := serverTool.Tool
+	require.NoError(t, toolsnaps.Test(tool.Name, tool))
+
+	schema, ok := tool.InputSchema.(*jsonschema.Schema)
+	require.True(t, ok, "InputSchema should be *jsonschema.Schema")
+
+	assert.Equal(t, "list_repository_collaborators", tool.Name)
+	assert.NotEmpty(t, tool.Description)
+	assert.True(t, tool.Annotations.ReadOnlyHint)
+	assert.Contains(t, schema.Properties, "owner")
+	assert.Contains(t, schema.Properties, "repo")
+	assert.Contains(t, schema.Properties, "affiliation")
+	assert.Contains(t, schema.Properties, "permission")
+	assert.Contains(t, schema.Properties, "page")
+	assert.Contains(t, schema.Properties, "perPage")
+	assert.ElementsMatch(t, schema.Required, []string{"owner", "repo"})
+
+	mockCollaborators := []*github.User{
+		{
+			Login:     github.Ptr("alice"),
+			ID:        github.Ptr(int64(1)),
+			HTMLURL:   github.Ptr("https://github.com/alice"),
+			AvatarURL: github.Ptr("https://avatars.githubusercontent.com/u/1"),
+		},
+		{
+			Login:     github.Ptr("bob"),
+			ID:        github.Ptr(int64(2)),
+			HTMLURL:   github.Ptr("https://github.com/bob"),
+			AvatarURL: github.Ptr("https://avatars.githubusercontent.com/u/2"),
+		},
+	}
+
+	const listCollaboratorsEndpoint = "GET /repos/{owner}/{repo}/collaborators"
+
+	tests := []struct {
+		name           string
+		mockedClient   *http.Client
+		requestArgs    map[string]interface{}
+		expectError    bool
+		expectedErrMsg string
+		expectedCount  int
+	}{
+		{
+			name: "successful list",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				listCollaboratorsEndpoint: mockResponse(t, http.StatusOK, mockCollaborators),
+			}),
+			requestArgs: map[string]interface{}{
+				"owner": "owner",
+				"repo":  "my-repo",
+			},
+			expectError:   false,
+			expectedCount: 2,
+		},
+		{
+			name: "list with affiliation filter",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				listCollaboratorsEndpoint: mockResponse(t, http.StatusOK, mockCollaborators[:1]),
+			}),
+			requestArgs: map[string]interface{}{
+				"owner":       "owner",
+				"repo":        "my-repo",
+				"affiliation": "direct",
+			},
+			expectError:   false,
+			expectedCount: 1,
+		},
+		{
+			name: "list fails",
+			mockedClient: MockHTTPClientWithHandlers(map[string]http.HandlerFunc{
+				listCollaboratorsEndpoint: mockResponse(t, http.StatusNotFound, `{"message": "Not Found"}`),
+			}),
+			requestArgs: map[string]interface{}{
+				"owner": "owner",
+				"repo":  "nonexistent",
+			},
+			expectError:    true,
+			expectedErrMsg: "failed to list collaborators",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := github.NewClient(tc.mockedClient)
+			deps := BaseDeps{Client: client}
+			handler := serverTool.Handler(deps)
+
+			request := createMCPRequest(tc.requestArgs)
+			result, err := handler(ContextWithDeps(context.Background(), deps), &request)
+
+			if tc.expectError {
+				require.NoError(t, err)
+				require.True(t, result.IsError)
+				errorContent := getErrorResult(t, result)
+				assert.Contains(t, errorContent.Text, tc.expectedErrMsg)
+				return
+			}
+
+			require.NoError(t, err)
+			require.False(t, result.IsError)
+
+			textContent := getTextResult(t, result)
+			var returnedUsers []MinimalUser
+			err = json.Unmarshal([]byte(textContent.Text), &returnedUsers)
+			require.NoError(t, err)
+
+			assert.Len(t, returnedUsers, tc.expectedCount)
+			if tc.expectedCount > 0 {
+				assert.Equal(t, "alice", returnedUsers[0].Login)
+			}
+		})
+	}
+}

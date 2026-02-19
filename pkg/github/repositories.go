@@ -2434,6 +2434,210 @@ func StarRepository(t translations.TranslationHelperFunc) inventory.ServerTool {
 	)
 }
 
+// GetRepository creates a tool to get details of a specific GitHub repository.
+func GetRepository(t translations.TranslationHelperFunc) inventory.ServerTool {
+	return NewTool(
+		ToolsetMetadataRepos,
+		mcp.Tool{
+			Name:        "get_repository",
+			Description: t("TOOL_GET_REPOSITORY_DESCRIPTION", "Get details of a specific GitHub repository. Returns repository metadata including description, stars, forks, language, topics, and more."),
+			Annotations: &mcp.ToolAnnotations{
+				Title:        t("TOOL_GET_REPOSITORY_USER_TITLE", "Get repository details"),
+				ReadOnlyHint: true,
+			},
+			InputSchema: &jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"owner": {
+						Type:        "string",
+						Description: "Repository owner (username or organization)",
+					},
+					"repo": {
+						Type:        "string",
+						Description: "Repository name",
+					},
+				},
+				Required: []string{"owner", "repo"},
+			},
+		},
+		[]scopes.Scope{scopes.Repo},
+		func(ctx context.Context, deps ToolDependencies, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+			owner, err := RequiredParam[string](args, "owner")
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+			repo, err := RequiredParam[string](args, "repo")
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+
+			client, err := deps.GetClient(ctx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+			repository, resp, err := client.Repositories.Get(ctx, owner, repo)
+			if err != nil {
+				return ghErrors.NewGitHubAPIErrorResponse(ctx,
+					fmt.Sprintf("failed to get repository %s/%s", owner, repo),
+					resp,
+					err,
+				), nil, nil
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			if resp.StatusCode != http.StatusOK {
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+				}
+				return ghErrors.NewGitHubAPIStatusErrorResponse(ctx, "failed to get repository", resp, body), nil, nil
+			}
+
+			minimalRepo := MinimalRepository{
+				ID:            repository.GetID(),
+				Name:          repository.GetName(),
+				FullName:      repository.GetFullName(),
+				Description:   repository.GetDescription(),
+				HTMLURL:       repository.GetHTMLURL(),
+				Language:      repository.GetLanguage(),
+				Stars:         repository.GetStargazersCount(),
+				Forks:         repository.GetForksCount(),
+				OpenIssues:    repository.GetOpenIssuesCount(),
+				Private:       repository.GetPrivate(),
+				Fork:          repository.GetFork(),
+				Archived:      repository.GetArchived(),
+				DefaultBranch: repository.GetDefaultBranch(),
+			}
+			if repository.UpdatedAt != nil {
+				minimalRepo.UpdatedAt = repository.UpdatedAt.Format("2006-01-02T15:04:05Z")
+			}
+			if repository.CreatedAt != nil {
+				minimalRepo.CreatedAt = repository.CreatedAt.Format("2006-01-02T15:04:05Z")
+			}
+			if repository.Topics != nil {
+				minimalRepo.Topics = repository.Topics
+			}
+
+			r, err := json.Marshal(minimalRepo)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to marshal repository: %w", err)
+			}
+
+			return utils.NewToolResultText(string(r)), nil, nil
+		},
+	)
+}
+
+// ListRepositoryCollaborators creates a tool to list collaborators of a GitHub repository.
+func ListRepositoryCollaborators(t translations.TranslationHelperFunc) inventory.ServerTool {
+	return NewTool(
+		ToolsetMetadataRepos,
+		mcp.Tool{
+			Name:        "list_repository_collaborators",
+			Description: t("TOOL_LIST_REPOSITORY_COLLABORATORS_DESCRIPTION", "List collaborators of a GitHub repository"),
+			Annotations: &mcp.ToolAnnotations{
+				Title:        t("TOOL_LIST_REPOSITORY_COLLABORATORS_USER_TITLE", "List repository collaborators"),
+				ReadOnlyHint: true,
+			},
+			InputSchema: WithPagination(&jsonschema.Schema{
+				Type: "object",
+				Properties: map[string]*jsonschema.Schema{
+					"owner": {
+						Type:        "string",
+						Description: "Repository owner (username or organization)",
+					},
+					"repo": {
+						Type:        "string",
+						Description: "Repository name",
+					},
+					"affiliation": {
+						Type:        "string",
+						Description: "Filter collaborators by affiliation: 'outside' (external collaborators), 'direct' (direct collaborators), or 'all' (default)",
+						Enum:        []any{"outside", "direct", "all"},
+					},
+					"permission": {
+						Type:        "string",
+						Description: "Filter collaborators by permission: 'pull', 'triage', 'push', 'maintain', or 'admin'",
+						Enum:        []any{"pull", "triage", "push", "maintain", "admin"},
+					},
+				},
+				Required: []string{"owner", "repo"},
+			}),
+		},
+		[]scopes.Scope{scopes.Repo},
+		func(ctx context.Context, deps ToolDependencies, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
+			owner, err := RequiredParam[string](args, "owner")
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+			repo, err := RequiredParam[string](args, "repo")
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+			affiliation, err := OptionalParam[string](args, "affiliation")
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+			permission, err := OptionalParam[string](args, "permission")
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+			pagination, err := OptionalPaginationParams(args)
+			if err != nil {
+				return utils.NewToolResultError(err.Error()), nil, nil
+			}
+
+			opts := &github.ListCollaboratorsOptions{
+				Affiliation: affiliation,
+				Permission:  permission,
+				ListOptions: github.ListOptions{
+					Page:    pagination.Page,
+					PerPage: pagination.PerPage,
+				},
+			}
+
+			client, err := deps.GetClient(ctx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to get GitHub client: %w", err)
+			}
+			collaborators, resp, err := client.Repositories.ListCollaborators(ctx, owner, repo, opts)
+			if err != nil {
+				return ghErrors.NewGitHubAPIErrorResponse(ctx,
+					fmt.Sprintf("failed to list collaborators for repository %s/%s", owner, repo),
+					resp,
+					err,
+				), nil, nil
+			}
+			defer func() { _ = resp.Body.Close() }()
+
+			if resp.StatusCode != http.StatusOK {
+				body, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to read response body: %w", err)
+				}
+				return ghErrors.NewGitHubAPIStatusErrorResponse(ctx, "failed to list repository collaborators", resp, body), nil, nil
+			}
+
+			minimalUsers := make([]MinimalUser, 0, len(collaborators))
+			for _, u := range collaborators {
+				minimalUsers = append(minimalUsers, MinimalUser{
+					Login:      u.GetLogin(),
+					ID:         u.GetID(),
+					ProfileURL: u.GetHTMLURL(),
+					AvatarURL:  u.GetAvatarURL(),
+				})
+			}
+
+			r, err := json.Marshal(minimalUsers)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to marshal collaborators: %w", err)
+			}
+
+			return utils.NewToolResultText(string(r)), nil, nil
+		},
+	)
+}
+
 // UnstarRepository creates a tool to unstar a repository.
 func UnstarRepository(t translations.TranslationHelperFunc) inventory.ServerTool {
 	return NewTool(

@@ -1234,6 +1234,11 @@ The following sets of tools are available:
   - `repo`: Repository name (string, required)
   - `tag`: Tag name (e.g., 'v1.0.0') (string, required)
 
+- **get_repository** - Get repository details
+  - **Required OAuth Scopes**: `repo`
+  - `owner`: Repository owner (username or organization) (string, required)
+  - `repo`: Repository name (string, required)
+
 - **get_tag** - Get tag details
   - **Required OAuth Scopes**: `repo`
   - `owner`: Repository owner (string, required)
@@ -1261,6 +1266,15 @@ The following sets of tools are available:
   - `owner`: Repository owner (string, required)
   - `page`: Page number for pagination (min 1) (number, optional)
   - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
+  - `repo`: Repository name (string, required)
+
+- **list_repository_collaborators** - List repository collaborators
+  - **Required OAuth Scopes**: `repo`
+  - `affiliation`: Filter collaborators by affiliation: 'outside' (external collaborators), 'direct' (direct collaborators), or 'all' (default) (string, optional)
+  - `owner`: Repository owner (username or organization) (string, required)
+  - `page`: Page number for pagination (min 1) (number, optional)
+  - `perPage`: Results per page for pagination (min 1, max 100) (number, optional)
+  - `permission`: Filter collaborators by permission: 'pull', 'triage', 'push', 'maintain', or 'admin' (string, optional)
   - `repo`: Repository name (string, required)
 
 - **list_tags** - List tags
